@@ -9,7 +9,7 @@ from sqlalchemy.orm import sessionmaker
 from datetime import datetime, time, date
 from sqlalchemy import create_engine, select, func
 from models import Tutor, CurrentPoints, Availability, DAYS_OF_THE_WEEK, DEED_STATUS, Deeds, Announced_Deeds, Deeds_Logs, Tutored_Courses, Courses
-from Admin import add_new_tutor, Del_tutor, Alter_Tutor_points, Workshop_Course_List, Create_Workshop_deeds, Claim_Workshop_deed, Complete_Workshop_Deeds
+from Admin import add_new_tutor, Del_tutor, Alter_Tutor_points, Workshop_Course_List, View_All_Tutors
 
 load_dotenv()
 engine = create_engine(os.getenv("DATABASE_URL"), echo=True)
@@ -377,8 +377,12 @@ class Complete_Deeds(discord.ui.Modal, title="Complete Deeds"):
                 await interaction.response.send_message("Please claim the deed before you can complete it", ephemeral=True)    
 
 class Admin(discord.ui.View):
+    def __init__(self, bot):
+        super().__init__(timeout=None)
+        self.bot = bot
+
     @discord.ui.select(
-        placeholder="Please select admin powers you will like to use: ",
+    placeholder="Please select admin powers you will like to use: ",
         options=[
             discord.SelectOption(label="Add a new tutor", value=1),
             discord.SelectOption(label="Delete Tutor", value=2),
@@ -389,31 +393,20 @@ class Admin(discord.ui.View):
     )
 
     async def on_submit(self, interaction: discord.Interaction, select):
-        print("Select: ", select.values[0])
-        if(select.values[0] == 1):
+        if(select.values[0] == "1"):
+            print("poop")
             await interaction.response.send_modal(add_new_tutor())
-        elif(select.values[0] == 2):
+        elif(select.values[0] == "2"):
             await interaction.response.send_modal(Del_tutor())
-        elif(select.values[0] == 3):
-            await interaction.response.send_modal(Workshop_Course_List())
+        elif(select.values[0] == "3"):
+            await interaction.response.send_modal(Workshop_Course_List(self.bot))
             #Need to add bot it is one of the parameters for the class
-        elif(select.values[0] == 4):
-            stmt = select(Tutor).join(Tutor.Current_points)
-            All_Tutors = session.execute(stmt).scalars().all()
-            tutors_embed = discord.embed(
-                title="Current Tutors",
-                description=f"Here is a list of current tutors",
-                color=discord.Color.blue() 
-            )
-            for tutor in All_Tutors:
-                tutors_embed.add_field(name=f"{tutor.First_Name} {tutor.Last_Name}: ", value=f"{tutor.Current_points.Deeds_Point}", inline=True)
-            await interaction.response.send_message(embed=tutors_embed)
-        elif(select.values[0] == 5):
+        elif(select.values[0] == "4"):
+            Current_View = View_All_Tutors
+            embed = await Current_View.View_Embed()
+            await interaction.response.send_message(embed=embed)
+        elif(select.values[0] == "5"):
             await interaction.response.send_modal(Alter_Tutor_points())
-
-
-
-
 
 class Tutoring_Cog(commands.Cog):
     def __init__(self, bot):
@@ -506,7 +499,7 @@ class Tutoring_Cog(commands.Cog):
         if not interaction.user.guild_permissions.administrator:
             return await interaction.response.send_message("You don't have admin permissions to use this command.")
         else:
-            await interaction.response.send_message(view=Admin())
+            await interaction.response.send_message(view=Admin(self.bot))
     @tasks.loop(minutes=15)
     async def Update_Deeds(self):
         stmt = select(Deeds).where(

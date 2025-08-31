@@ -30,9 +30,9 @@ class add_new_tutor(discord.ui.Modal, title="New Tutor form"):
         Discord_ID = self.Discord_ID.value
         First_Name = self.First_Name.value
         Last_Name = self.Last_Name.value
-        if self.Role.value == 1:
+        if self.Role.value == "1":
             Role = ROLES.TUTOR
-        elif self.Role.value == 2:
+        elif self.Role.value == "2":
             Role = ROLES.WORKSHOP_DIRECTOR
         
         New_Tutor = Tutor(
@@ -44,7 +44,7 @@ class add_new_tutor(discord.ui.Modal, title="New Tutor form"):
         )
         session.add(New_Tutor)
         session.commit()
-        interaction.response.send_message(f"This tutor: {Discord_ID} has been sucessfully added", ephermal=True)
+        interaction.response.send_message(f"This tutor: {Discord_ID} has been sucessfully added", ephemeral=True)
 
 class Del_tutor(discord.ui.Modal, title="Delete Tutor form"):
     Discord_ID = discord.ui.TextInput(label="Discord Username", style=discord.TextStyle.short)
@@ -56,9 +56,9 @@ class Del_tutor(discord.ui.Modal, title="Delete Tutor form"):
         if(Current_Tutor):
             Current_Tutor.Is_Active = Active.NOTACTIVE
             session.commit()
-            interaction.response.send_message(f"This tutor: {Discord_ID} has been sucessfully deleted", ephermal=True)
+            await interaction.response.send_message(f"This tutor: {Discord_ID} has been sucessfully deleted", ephemeral=True)
         else:
-            interaction.response.send_message(f"This person: {Discord_ID} is not a tutor", ephermal=True)
+            await interaction.response.send_message(f"This person: {Discord_ID} is not a tutor", ephemeral=True)
 
 class Alter_Tutor_points(discord.ui.Modal, title="Alter Point Value"):
     Discord_ID = discord.ui.TextInput(label="Discord Username", style=discord.TextStyle.short)
@@ -82,7 +82,7 @@ class Alter_Tutor_points(discord.ui.Modal, title="Alter Point Value"):
                 former_value = Current_Tutor.Current_points
                 Current_Tutor.Current_points = New_Point_Value
             session.commit()
-            interaction.response.send_message(f"This tutor: {Discord_ID} points has been changed sucessfully from {former_value} to {New_Point_Value}", ephermal=True)
+            await interaction.response.send_message(f"This tutor: {Discord_ID} points has been changed sucessfully from {former_value} to {New_Point_Value}", ephemeral=True)
 
 class Workshop_Course_List(discord.ui.View):
     def __init__(self, bot):
@@ -146,7 +146,7 @@ class Create_Workshop_deeds(discord.ui.Modal, title="Create Workshop Deeds"):
         view = Claim_Workshop_deed(Deed_ID)
         await self.update_channel.send(embed=embed, view=view)
 
-class Claim_Workshop_deed(discord.ui.view):
+class Claim_Workshop_deed(discord.ui.View):
     def __init__(self, deed_ID):
         super().__init__(timeout=None)
         self.deed_id = deed_ID
@@ -156,7 +156,7 @@ class Claim_Workshop_deed(discord.ui.view):
         stmt = select(Workshop_Deeds).where(Workshop_Deeds.ID == self.deed_id, Workshop_Deeds.Current_Status == DEED_STATUS.COMPLETED)
         status = session.execute(stmt).scalars().all()
         if(status):
-            interaction.response.send_message(f"This deed is already closed", ephermal=True)
+            interaction.response.send_message(f"This deed is already closed", ephemeral=True)
             return
         tutor = interaction.user.name
         stmt = select(Tutor).where(Tutor.Discord_ID == tutor)
@@ -166,7 +166,7 @@ class Claim_Workshop_deed(discord.ui.view):
                                                          Workshop_Participations.Tutor == Current_Tutor.Discord_ID)
             Tutor_Confirm = session.execute(stmt).scalars().all()
             if(Tutor_Confirm):
-                interaction.response.send_message(f"You have already registered for this deed", ephermal=True)
+                interaction.response.send_message(f"You have already registered for this deed", ephemeral=True)
                 return
             stmt = select(Workshop_Participations).where(Workshop_Participations.Workshop_Deed_ID == self.deed_id)
             Participant_List = session.execute(stmt).scalars().all()
@@ -174,7 +174,7 @@ class Claim_Workshop_deed(discord.ui.view):
             Workshop = session.execute(stmt).scalars().first()
             Num_of_tutors = Workshop.num_of_tutors
             if(len(Participant_List) >= int(Num_of_tutors)):
-                interaction.response.send_message(f"The amount of tutor has already been reached", ephermal=True)
+                interaction.response.send_message(f"The amount of tutor has already been reached", ephemeral=True)
             else: 
                 await interaction.message.delete()
                 workshop_part = Workshop_Participations(
@@ -192,7 +192,7 @@ class Claim_Workshop_deed(discord.ui.view):
                 embed.add_field(name=f"Needed Tutors", value=f"{Num_of_tutors}", inline=True)
                 embed.add_field(name="Current number of tutors: ", value=f"{len(Participant_List) + 1}", inline=True)
                 embed.add_field(name=f"Topic to be covered", value=f"{Workshop.Topic_Covered}", inline=True)
-                interaction.response.send_message(f"You have been added to the deed teaam expect to be contacted by Franklin on the details of the workshop", ephermal=True)
+                interaction.response.send_message(f"You have been added to the deed teaam expect to be contacted by Franklin on the details of the workshop", ephemeral=True)
                 interaction.response.edit_message(embed=embed)
 
 class Complete_Workshop_Deeds(discord.ui.Modal, title="Complete Workshop Deed"):
@@ -237,9 +237,19 @@ class Complete_Workshop_Deeds(discord.ui.Modal, title="Complete Workshop Deed"):
                 session.add(New_Point_Haver)
                 session.commit()
         else:
-            interaction.response.send_message(f"You are not a tutor you cannot run this command", ephermal=True)
+            interaction.response.send_message(f"You are not a tutor you cannot run this command", ephemeral=True)
 
-
-
+class View_All_Tutors():
+    async def View_Embed():
+        stmt = select(Tutor).join(Tutor.Current_points)
+        All_Tutors = session.execute(stmt).scalars().all()
+        tutors_embed = discord.Embed(
+            title="Current Tutors",
+            description=f"Here is a list of current tutors",
+            color=discord.Color.blue() 
+        )
+        for tutor in All_Tutors:
+            tutors_embed.add_field(name=f"{tutor.First_Name} {tutor.Last_Name}: ", value=f"{tutor.Current_points.Deeds_Point}", inline=True)
+        return tutors_embed
 
 
