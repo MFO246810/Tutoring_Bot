@@ -9,9 +9,10 @@ from sqlalchemy.orm import sessionmaker
 from datetime import datetime, time, date
 from sqlalchemy import create_engine, select, func
 from models import Tutor, CurrentPoints, Availability, DAYS_OF_THE_WEEK, DEED_STATUS, Deeds, Announced_Deeds, Deeds_Logs, Tutored_Courses, Courses
+from Admin import add_new_tutor, Del_tutor, Alter_Tutor_points, Workshop_Course_List, Create_Workshop_deeds, Claim_Workshop_deed, Complete_Workshop_Deeds
 
 load_dotenv()
-engine = create_engine(os.getenv("Database_uri"), echo=True)
+engine = create_engine(os.getenv("DATABASE_URL"), echo=True)
 Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
 session = Session()
@@ -390,12 +391,12 @@ class Admin(discord.ui.View):
     async def on_submit(self, interaction: discord.Interaction, select):
         print("Select: ", select.values[0])
         if(select.values[0] == 1):
-            await interaction.response.send_modal(Complete_Deeds())
+            await interaction.response.send_modal(add_new_tutor())
         elif(select.values[0] == 2):
-            print ("poop")
-            await interaction.response.send_message(view=Complete_Deeds_Course_List())
+            await interaction.response.send_modal(Del_tutor())
         elif(select.values[0] == 3):
-            await interaction.response.send_modal(Complete_Deeds())
+            await interaction.response.send_modal(Workshop_Course_List())
+            #Need to add bot it is one of the parameters for the class
         elif(select.values[0] == 4):
             stmt = select(Tutor).join(Tutor.Current_points)
             All_Tutors = session.execute(stmt).scalars().all()
@@ -408,7 +409,7 @@ class Admin(discord.ui.View):
                 tutors_embed.add_field(name=f"{tutor.First_Name} {tutor.Last_Name}: ", value=f"{tutor.Current_points.Deeds_Point}", inline=True)
             await interaction.response.send_message(embed=tutors_embed)
         elif(select.values[0] == 5):
-            await interaction.response.send_modal(Complete_Deeds())
+            await interaction.response.send_modal(Alter_Tutor_points())
 
 
 

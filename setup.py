@@ -6,10 +6,10 @@ from models import Base
 from dotenv import load_dotenv
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine, select
-from models import Courses, Tutor, ROLES, Availability, DAYS_OF_THE_WEEK, Tutored_Courses
+from models import Courses, Tutor, ROLES, Availability, DAYS_OF_THE_WEEK, Tutored_Courses, Active
 
 load_dotenv()
-engine = create_engine(os.getenv("Database_uri"), echo=True)
+engine = create_engine(os.getenv("DATABASE_URL"), echo=True)
 Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
 session = Session()
@@ -34,11 +34,11 @@ def Add_Tutors():
         for row in CSV_FILE:
             row['Role'] = int(row['Role'])
             if(row['Role'] == 0):
-                New_Tutor = Tutor(Discord_ID=row['Discord_ID'], First_Name=row['First_Name'], Last_Name=row['Last_Name'], Current_Role=ROLES.TUTOR)
+                New_Tutor = Tutor(Discord_ID=row['Discord_ID'], First_Name=row['First_Name'], Last_Name=row['Last_Name'], Current_Role=ROLES.TUTOR, Is_Active=Active.ACTIVE)
                 session.add(New_Tutor)
                 session.commit()
             elif(row['Role'] == 1):
-                New_Tutor = Tutor(Discord_ID=row['Discord_ID'], First_Name=row['First_Name'], Last_Name=row['Last_Name'], Current_Role=ROLES.WORKSHOP_DIRECTOR)
+                New_Tutor = Tutor(Discord_ID=row['Discord_ID'], First_Name=row['First_Name'], Last_Name=row['Last_Name'], Current_Role=ROLES.WORKSHOP_DIRECTOR, Is_Active=Active.ACTIVE)
                 session.add(New_Tutor)
                 session.commit()
 
@@ -121,11 +121,8 @@ def Add_TUTORED_COURSES():
             stmt = select(Courses.Courses_ID).where(Courses.Courses_Name == row['Courses_ID'])
             Courses_ID = session.execute(stmt).scalars().all()
             print("Courses: ", Courses_ID)
-            New_Tutored_Courses = Tutored_Courses(ID=row['ID'], Discord_ID=row["Discord_ID"], Courses_ID=Courses_ID[0])
+            New_Tutored_Courses = Tutored_Courses(ID=current_milli_time(), Discord_ID=row["Discord_ID"], Courses_ID=Courses_ID[0])
             session.add(New_Tutored_Courses)
             session.commit()
-
-Add_courses()          
-Add_Tutors()
-Add_Availabilities()
+     
 Add_TUTORED_COURSES()

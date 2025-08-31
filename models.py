@@ -1,10 +1,11 @@
 import enum
 import datetime
+from typing import List
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import relationship
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy import String, BigInteger, SmallInteger, Integer, Time, ForeignKey, DateTime, Text, Enum
+from sqlalchemy import String, BigInteger, Integer, Time, ForeignKey, DateTime, Text, Enum
 
 class Base(DeclarativeBase):
     pass
@@ -42,8 +43,8 @@ class Tutor(Base):
     Is_Active: Mapped[Active] = mapped_column(Enum(Active, name="Active", create_constraint=True), nullable=False)
 
     # Relationships
-    Availabilities: Mapped[list["Availability"]] = relationship(back_populates="tutor")
-    Current_Courses: Mapped[list["Tutored_Courses"]] = relationship(back_populates="Course_Tutors")
+    Availabilities: Mapped[List["Availability"]] = relationship(back_populates="tutor")
+    Current_Courses: Mapped[List["Tutored_Courses"]] = relationship(back_populates="Course_Tutors")
     Current_points: Mapped["CurrentPoints"] = relationship(back_populates="Tutor_Points")
 
 class CurrentPoints(Base):
@@ -88,7 +89,7 @@ class Tutored_Courses(Base):
     Courses_ID: Mapped[int] = mapped_column(BigInteger, ForeignKey("Courses.Courses_ID"), nullable=False)
 
     #Relationships
-    Course_Tutors: Mapped[list[Tutor]]= relationship(back_populates="Current_Courses")
+    Course_Tutors: Mapped[List[Tutor]]= relationship(back_populates="Current_Courses")
     course: Mapped["Courses"] = relationship(back_populates="Actual_course")
 
 class Deeds(Base):

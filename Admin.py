@@ -8,10 +8,10 @@ from discord.ext import tasks, commands
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime, time, date
 from sqlalchemy import create_engine, select, func
-from models import Tutor, CurrentPoints, Availability, DAYS_OF_THE_WEEK, DEED_STATUS, Deeds, Announced_Deeds, Deeds_Logs, Tutored_Courses, Courses, ROLES, Active, Workshop_Deeds
+from models import Tutor, CurrentPoints, DEED_STATUS, ROLES, Active, Workshop_Deeds, Workshop_Participations, Workshop_Deeds_Logs
 
 load_dotenv()
-engine = create_engine(os.getenv("Database_uri"), echo=True)
+engine = create_engine(os.getenv("DATABASE_URL"), echo=True)
 Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
 session = Session()
@@ -108,8 +108,9 @@ class Workshop_Course_List(discord.ui.View):
         await interaction.response.send_modal(Create_Workshop_deeds(self.bot, workshop_course, username))
 
 class Create_Workshop_deeds(discord.ui.Modal, title="Create Workshop Deeds"):
-    def __init__(self, courses, username):
+    def __init__(self, bot, courses, username):
         super().__init__(timeout=None)
+        self.bot = bot
         self.course = courses
         self.username = username
     
@@ -117,34 +118,128 @@ class Create_Workshop_deeds(discord.ui.Modal, title="Create Workshop Deeds"):
     Topics_Covered = discord.ui.TextInput(label="Topics to be covered", style=discord.TextStyle.paragraph)
 
     async def Chosen_Courses(self, interaction: discord.Interaction, select):
-        workshop_course = select.values[0]
-        username = interaction.user.name
         num_of_tutors = self.num_of_tutors.value
         Topics_Covered = self.Topics_Covered.value       
-
+        Deed_ID = current_milli_time()
         New_Workshop_deeds =  Workshop_Deeds(
-            ID=current_milli_time(),
-            Creator=username,
-            Course_Name=workshop_course,
+            ID=Deed_ID,
+            Creator=self.username,
+            Course_Name=self.course,
             Created_Time = datetime.now(),
             Current_Status = DEED_STATUS.UNCLAIMED,
             num_of_tutors = num_of_tutors,
             Topics_Covered = Topics_Covered
         )
+        session.add(New_Workshop_deeds)
+        session.commit()                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
         embed = discord.Embed(
             title="Workshop Deed",
             description=f"New Workshop Course has been annouced ",
             color=discord.Color.red()  
         ) 
+        embed.add_field(name=f"Deed ID: ", value=f"{Deed_ID}", inline=True)
         embed.add_field(name=f"Needed Tutors", value=f"{num_of_tutors}", inline=True)
+        embed.add_field(name="Current number of tutors: ", value=f"0", inline=True)
         embed.add_field(name=f"Topic to be covered", value=f"{Topics_Covered}", inline=True)
-        session.add(New_Workshop_deeds)
-        session.commit()
+        self.update_channel_id = int(os.getenv("Discord_Channel_ID"))
+        self.update_channel = await self.bot.fetch_channel(self.update_channel_id)
+        view = Claim_Workshop_deed(Deed_ID)
+        await self.update_channel.send(embed=embed, view=view)
+
+class Claim_Workshop_deed(discord.ui.view):
+    def __init__(self, deed_ID):
+        super().__init__(timeout=None)
+        self.deed_id = deed_ID
+
+    @discord.ui.button(label="Join the team", style=discord.ButtonStyle.green)
+    async def button_callback (self, interaction: discord.Interaction, button: discord.ui.Button):
+        stmt = select(Workshop_Deeds).where(Workshop_Deeds.ID == self.deed_id, Workshop_Deeds.Current_Status == DEED_STATUS.COMPLETED)
+        status = session.execute(stmt).scalars().all()
+        if(status):
+            interaction.response.send_message(f"This deed is already closed", ephermal=True)
+            return
+        tutor = interaction.user.name
+        stmt = select(Tutor).where(Tutor.Discord_ID == tutor)
+        Current_Tutor = session.execute(stmt).scalars().first()
+        if(Current_Tutor):
+            stmt = select(Workshop_Participations).where(Workshop_Participations.Workshop_Deed_ID == self.deed_id, 
+                                                         Workshop_Participations.Tutor == Current_Tutor.Discord_ID)
+            Tutor_Confirm = session.execute(stmt).scalars().all()
+            if(Tutor_Confirm):
+                interaction.response.send_message(f"You have already registered for this deed", ephermal=True)
+                return
+            stmt = select(Workshop_Participations).where(Workshop_Participations.Workshop_Deed_ID == self.deed_id)
+            Participant_List = session.execute(stmt).scalars().all()
+            stmt = select(Workshop_Deeds).where(Workshop_Deeds.ID == self.deed_id)
+            Workshop = session.execute(stmt).scalars().first()
+            Num_of_tutors = Workshop.num_of_tutors
+            if(len(Participant_List) >= int(Num_of_tutors)):
+                interaction.response.send_message(f"The amount of tutor has already been reached", ephermal=True)
+            else: 
+                await interaction.message.delete()
+                workshop_part = Workshop_Participations(
+                    Workshop_Deed_ID = self.deed_id,
+                    Tutor=tutor
+                )
+                session.add(workshop_part)
+                session.commit
+                embed = discord.Embed(
+                title="Workshop Deed",
+                description=f"New Workshop Course has been annouced ",
+                color=discord.Color.red()  
+                ) 
+                embed.add_field(name=f"Deed ID: ", value=f"{Workshop.ID}", inline=True)
+                embed.add_field(name=f"Needed Tutors", value=f"{Num_of_tutors}", inline=True)
+                embed.add_field(name="Current number of tutors: ", value=f"{len(Participant_List) + 1}", inline=True)
+                embed.add_field(name=f"Topic to be covered", value=f"{Workshop.Topic_Covered}", inline=True)
+                interaction.response.send_message(f"You have been added to the deed teaam expect to be contacted by Franklin on the details of the workshop", ephermal=True)
+                interaction.response.edit_message(embed=embed)
+
+class Complete_Workshop_Deeds(discord.ui.Modal, title="Complete Workshop Deed"):
+    Deed_ID = discord.ui.TextInput(label="Deed ID", style=discord.TextStyle.short)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        student = interaction.user.name
+        Deed_id = int(self.Deed_ID.value)
+        v_stmt = select(Tutor).where(Tutor.Discord_ID == student)
+        Current_Tutor = session.execute(v_stmt).scalars().first()
+        if(Current_Tutor):
+            stmt = select(Workshop_Deeds).where(Workshop_Deeds.ID == Deed_id)
+            Current_Deed = session.execute(stmt).scalars().first()
+            Workshop_log = Workshop_Deeds_Logs(
+                ID=current_milli_time,
+                Workshop_Deed_ID=Current_Deed.ID,
+                Log_Time=datetime.now(),
+                Tutor=Current_Tutor.Discord_ID
+            )
+            session.add(Workshop_log)
+            stmt = select(CurrentPoints).where(CurrentPoints.Discord_ID == Current_Tutor.Discord_ID)
+            Current_Points = session.execute(stmt).scalars().first()
+            if(Current_Points):
+                Current_Points.Deeds_Point = Current_Points.Deeds_Point + 1
+                point_Embed =discord.Embed(
+                    title="Deed Recorded Sucessfully",
+                    description=f"Run /Leaderboard to see current rankings as well as /Current_Points to be dmed your point value",
+                    color=discord.Color.green()  
+                )
+                await interaction.response.send_message(embed=point_Embed)
+            else:
+                New_Point_Haver = CurrentPoints(
+                    Discord_ID = Current_Tutor.Discord_ID,
+                    Deeds_Point = 1
+                )
+                point_Embed =discord.Embed(
+                    title="Deed Recorded Sucessfully",
+                    description=f"Run /Leaderboard to see current rankings as well as /Current_Points to be dmed your point value",
+                    color=discord.Color.green()  
+                )
+                await interaction.response.send_message(embed=point_Embed)
+                session.add(New_Point_Haver)
+                session.commit()
+        else:
+            interaction.response.send_message(f"You are not a tutor you cannot run this command", ephermal=True)
 
 
 
-    
-    
-        
 
 
