@@ -3,13 +3,14 @@ import time as t
 import discord
 from models import Base
 from dotenv import load_dotenv
+from discord import app_commands
 from discord.ui import View, Button
 from discord.ext import tasks, commands
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime, time, date
 from sqlalchemy import create_engine, select, func
 from models import Tutor, CurrentPoints, Availability, DAYS_OF_THE_WEEK, DEED_STATUS, Deeds, Announced_Deeds, Deeds_Logs, Tutored_Courses, Courses
-from Admin import add_new_tutor, Del_tutor, Alter_Tutor_points, Workshop_Course_List, View_All_Tutors
+from Admin import add_new_tutor, Del_tutor, Alter_Tutor_points, Workshop_Course_List, View_All_Tutors, Complete_Workshop_Deeds
 
 load_dotenv()
 engine = create_engine(os.getenv("DATABASE_URL"), echo=True)
@@ -107,8 +108,9 @@ class __Question_Forms__(discord.ui.Modal, title="Question Form"):
         embed.add_field(name="Original Message", value=f"{message}", inline=False)
         embed.add_field(name="Deed ID: ", value=f"{Deed_ID}", inline=False)
         embed.set_author(name="Deed Informer")
-        Current_time = time(15,30,00)
-        Day_of_the_week = 3
+        now = datetime.now()
+        Current_time = time(now.strftime("%H:%M:%S"))
+        Day_of_the_week = now.weekday()
         tutors = get_user(Current_time=Current_time, Day_of_the_week=Day_of_the_week, courses=self.course)
         print("Tutors: ", tutors)
         if(len(tutors) == 0):
@@ -179,14 +181,14 @@ class Deeds_List(discord.ui.View):
     )
 
     async def on_submit(self, interaction: discord.Interaction, select):
+        await interaction.message.delete()
         print("Select: ", select.values[0])
         if(select.values[0] == "1"):
             await interaction.response.send_modal(Complete_Deeds())
         elif(select.values[0] == "2"):
-            print ("poop")
             await interaction.response.send_message(view=Complete_Deeds_Course_List())
         elif(select.values[0] == "3"):
-            await interaction.response.send_modal(Complete_Deeds())
+            await interaction.response.send_modal(Complete_Workshop_Deeds())
 
 class Complete_Deeds_Course_List(discord.ui.View):
     @discord.ui.select(
@@ -440,12 +442,10 @@ class Tutoring_Cog(commands.Cog):
         await interaction.response.send_message(view=self.view)
     
     @discord.app_commands.command(name="complete_deeds", description="This command is used to complete deeds and to receive the requiste points")
-    @discord.role_check(["Tutor"])
     async def complete_deeds(self, interaction: discord.Interaction):
         await interaction.response.send_message(view=Deeds_List())
 
     @discord.app_commands.command(name="current_points", description="This command is used to view your current points")
-    @discord.role_check(["Tutor"])
     async def current_points(self, interaction: discord.Interaction):
         user_name = interaction.user.name
         guild = interaction.guild
@@ -461,14 +461,13 @@ class Tutoring_Cog(commands.Cog):
                 )
                 target_user = discord.utils.get(guild.members, name=user_name)
                 await target_user.send(embed=Points_Embed)
-                return interaction.response.send_message("Your Points has been sent to you as a dm", ephermal=True)
+                return await interaction.response.send_message("Your Points has been sent to you as a dm", ephemeral=True)
             else:
-                return interaction.response.send_message("You Currently have no points", ephermal=True)
+                return await interaction.response.send_message("You Currently have no points", ephemeral=True)
         else:
-            return interaction.response.send_message("Unfortunately you are not a tutor we dont have any records for you", ephermal=True)
+            return await interaction.response.send_message("Unfortunately you are not a tutor we dont have any records for you", ephemeral=True)
 
     @discord.app_commands.command(name="leaderboard", description="This command is used to view the current leaderboard")
-    @discord.role_check(["Tutor"])
     async def leaderboard(self, interaction: discord.Interaction):
         user_name = interaction.user.name
         stmt =  select(Tutor).where(Tutor.Discord_ID == user_name)
@@ -481,13 +480,12 @@ class Tutoring_Cog(commands.Cog):
                 color=discord.Color.blue()  
             )
             for tutor in Current_tutors:
-                Points_Embed.add_field(name=f"{tutor.First_Name} {tutor.Last_Name}: ", value=f"{tutor.Current_points.Deeds_Point}")
+                Points_Embed.add_field(name=f"{tutor.First_Name} {tutor.Last_Name}: ", value=f"{tutor.Current_points.Deeds_Point}", inline=False)
             await interaction.response.send_message(embed=Points_Embed)
         else: 
             return interaction.response.send_message("Unfortunately you are not a tutor we dont have any records for you")
 
     @discord.app_commands.command(name="view_uncompleted_deeds", description="This command is used to view the ids of you current uncompleted deeds")
-    @discord.role_check(["Tutor"])
     async def view_uncompleted_deeds(self, interaction: discord.Interaction):
         user_name = interaction.user.name
         stmt =  select(Tutor).where(Tutor.Discord_ID == user_name)
@@ -509,12 +507,12 @@ class Tutoring_Cog(commands.Cog):
             return await interaction.response.send_message("Unfortunately you are not a tutor we dont have any records for you")
 
     @discord.app_commands.command(name="admin_panel", description="This command is only meant to be used by the admin")
-    @discord.role_check(["Officer"])
     async def admin_panel(self, interaction: discord.Interaction):
         if not interaction.user.guild_permissions.administrator:
             return await interaction.response.send_message("You don't have admin permissions to use this command.")
         else:
             await interaction.response.send_message(view=Admin(self.bot))
+    
     @tasks.loop(minutes=15)
     async def Update_Deeds(self):
         stmt = select(Deeds).where(

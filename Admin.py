@@ -197,7 +197,7 @@ class Claim_Workshop_deed(discord.ui.View):
                 embed.add_field(name="Current number of tutors: ", value=f"{len(Participant_List) + 1}", inline=True)
                 embed.add_field(name=f"Topic to be covered", value=f"{Workshop.Topic_Covered}", inline=True)
                 await interaction.user.send(f"You have been added to the deed team expect to be contacted by Franklin on the details of the workshop")
-                await interaction.response.send_message(embed=embed, view=Claim_Workshop_deed())
+                await interaction.response.send_message(embed=embed, view=Claim_Workshop_deed(Workshop.ID))
 
 class Complete_Workshop_Deeds(discord.ui.Modal, title="Complete Workshop Deed"):
     Deed_ID = discord.ui.TextInput(label="Deed ID", style=discord.TextStyle.short)
@@ -211,7 +211,7 @@ class Complete_Workshop_Deeds(discord.ui.Modal, title="Complete Workshop Deed"):
             stmt = select(Workshop_Deeds).where(Workshop_Deeds.ID == Deed_id)
             Current_Deed = session.execute(stmt).scalars().first()
             Workshop_log = Workshop_Deeds_Logs(
-                ID=current_milli_time,
+                ID=current_milli_time(),
                 Workshop_Deed_ID=Current_Deed.ID,
                 Log_Time=datetime.now(),
                 Tutor=Current_Tutor.Discord_ID
@@ -220,7 +220,7 @@ class Complete_Workshop_Deeds(discord.ui.Modal, title="Complete Workshop Deed"):
             stmt = select(CurrentPoints).where(CurrentPoints.Discord_ID == Current_Tutor.Discord_ID)
             Current_Points = session.execute(stmt).scalars().first()
             if(Current_Points):
-                Current_Points.Deeds_Point = Current_Points.Deeds_Point + 1
+                Current_Points.Deeds_Point = Current_Points.Deeds_Point + 2
                 point_Embed =discord.Embed(
                     title="Deed Recorded Sucessfully",
                     description=f"Run /Leaderboard to see current rankings as well as /Current_Points to be dmed your point value",

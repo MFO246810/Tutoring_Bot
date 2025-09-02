@@ -1,9 +1,19 @@
 
 {
     "Commands": [{
-        "Name": "questions",
-        "Command Call": "/questions",
-        "Decriptions": ""
+        "Name": "question",
+        "Command Call": "/question",
+        "Decriptions": "This is a function for sending out questions directly to tutors"
+    },{
+       "Name": "complete_deeds",
+        "Command Call": "/complete_deeds",
+        "Decriptions": "This command is used to complete deeds and to receive the requiste points" 
+    },{
+        "Name": "current_points",
+        "Command Call": "/current_points",
+        "Decriptions": "This command is used to view your current points" 
+    },{
+        
     }],
     
     "Tasks": {
