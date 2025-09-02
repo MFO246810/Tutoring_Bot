@@ -164,6 +164,7 @@ class Course_List(discord.ui.View):
         ]
     )
     async def Chosen_Courses(self, interaction: discord.Interaction, select):
+        await interaction.message.delete()
         print("Select: ", select.values[0])
         await interaction.response.send_modal(__Question_Forms__(select.values[0], self.bot))
 
@@ -203,6 +204,7 @@ class Complete_Deeds_Course_List(discord.ui.View):
     )
 
     async def on_submit(self, interaction: discord.Interaction, select):
+        await interaction.message.delete()
         print("Select: ", select.values[0])
         await interaction.response.send_modal(Complete_Inperson_Deeds(select.values[0]))
 
@@ -215,6 +217,11 @@ class _Buttons_(discord.ui.View):
     @discord.ui.button(label="Accept", style=discord.ButtonStyle.green)
     async def Accept_Condition (self, interaction: discord.Interaction, button: discord.ui.Button):
         print("DEED ID: ", self.deed_id)
+        v_stmt = select(Tutor).where(Tutor.Discord_ID == interaction.user.name)
+        Current_Tutor = session.execute(v_stmt).scalars().first()
+        if(Current_Tutor == None):
+            interaction.response.send_message("You are not a tutor youy cannot claim this deed", ephemeral=True)
+            return
         stmt = select(Deeds).where(Deeds.ID == int(self.deed_id))
         Deed = session.execute(stmt).scalars().first()
         if(Deed.Current_Status == DEED_STATUS.UNCLAIMED):
@@ -393,13 +400,15 @@ class Admin(discord.ui.View):
     )
 
     async def on_submit(self, interaction: discord.Interaction, select):
+        await interaction.message.delete()
         if(select.values[0] == "1"):
             print("poop")
             await interaction.response.send_modal(add_new_tutor())
         elif(select.values[0] == "2"):
             await interaction.response.send_modal(Del_tutor())
         elif(select.values[0] == "3"):
-            await interaction.response.send_modal(Workshop_Course_List(self.bot))
+            view = Workshop_Course_List(self.bot)
+            await interaction.response.send_message(view=view)
             #Need to add bot it is one of the parameters for the class
         elif(select.values[0] == "4"):
             Current_View = View_All_Tutors
@@ -431,10 +440,12 @@ class Tutoring_Cog(commands.Cog):
         await interaction.response.send_message(view=self.view)
     
     @discord.app_commands.command(name="complete_deeds", description="This command is used to complete deeds and to receive the requiste points")
+    @discord.role_check(["Tutor"])
     async def complete_deeds(self, interaction: discord.Interaction):
         await interaction.response.send_message(view=Deeds_List())
 
     @discord.app_commands.command(name="current_points", description="This command is used to view your current points")
+    @discord.role_check(["Tutor"])
     async def current_points(self, interaction: discord.Interaction):
         user_name = interaction.user.name
         guild = interaction.guild
@@ -450,12 +461,14 @@ class Tutoring_Cog(commands.Cog):
                 )
                 target_user = discord.utils.get(guild.members, name=user_name)
                 await target_user.send(embed=Points_Embed)
+                return interaction.response.send_message("Your Points has been sent to you as a dm", ephermal=True)
             else:
                 return interaction.response.send_message("You Currently have no points", ephermal=True)
         else:
             return interaction.response.send_message("Unfortunately you are not a tutor we dont have any records for you", ephermal=True)
 
     @discord.app_commands.command(name="leaderboard", description="This command is used to view the current leaderboard")
+    @discord.role_check(["Tutor"])
     async def leaderboard(self, interaction: discord.Interaction):
         user_name = interaction.user.name
         stmt =  select(Tutor).where(Tutor.Discord_ID == user_name)
@@ -468,12 +481,13 @@ class Tutoring_Cog(commands.Cog):
                 color=discord.Color.blue()  
             )
             for tutor in Current_tutors:
-                Points_Embed.add_field(name=f"{tutor.First_Name} {tutor.Last_Name}: ", value=f"{tutor.Current_points.Deeds_Point}", inline=True)
+                Points_Embed.add_field(name=f"{tutor.First_Name} {tutor.Last_Name}: ", value=f"{tutor.Current_points.Deeds_Point}")
             await interaction.response.send_message(embed=Points_Embed)
         else: 
             return interaction.response.send_message("Unfortunately you are not a tutor we dont have any records for you")
 
     @discord.app_commands.command(name="view_uncompleted_deeds", description="This command is used to view the ids of you current uncompleted deeds")
+    @discord.role_check(["Tutor"])
     async def view_uncompleted_deeds(self, interaction: discord.Interaction):
         user_name = interaction.user.name
         stmt =  select(Tutor).where(Tutor.Discord_ID == user_name)
@@ -495,6 +509,7 @@ class Tutoring_Cog(commands.Cog):
             return await interaction.response.send_message("Unfortunately you are not a tutor we dont have any records for you")
 
     @discord.app_commands.command(name="admin_panel", description="This command is only meant to be used by the admin")
+    @discord.role_check(["Officer"])
     async def admin_panel(self, interaction: discord.Interaction):
         if not interaction.user.guild_permissions.administrator:
             return await interaction.response.send_message("You don't have admin permissions to use this command.")

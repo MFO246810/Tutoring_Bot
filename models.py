@@ -126,7 +126,7 @@ class Workshop_Deeds(Base):
     Created_Time: Mapped[datetime.datetime] = mapped_column(DateTime, nullable=False)
     Current_Status: Mapped[DEED_STATUS] = mapped_column(Enum(DEED_STATUS, name="deed_status", create_constraint=True), nullable=False)
     Topic_Covered : Mapped[str] = mapped_column(Text)
-    num_of_tutors: Mapped[int] = mapped_column(Integer, nullable=True)
+    num_of_tutors: Mapped[int] = mapped_column(Integer, nullable=True, default=0)
 
 class Workshop_Deeds_Logs(Base):
     __tablename__ = "Workshop_Deeds_Logs"

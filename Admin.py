@@ -44,7 +44,7 @@ class add_new_tutor(discord.ui.Modal, title="New Tutor form"):
         )
         session.add(New_Tutor)
         session.commit()
-        interaction.response.send_message(f"This tutor: {Discord_ID} has been sucessfully added", ephemeral=True)
+        await interaction.response.send_message(f"This tutor: {Discord_ID} has been sucessfully added", ephemeral=True)
 
 class Del_tutor(discord.ui.Modal, title="Delete Tutor form"):
     Discord_ID = discord.ui.TextInput(label="Discord Username", style=discord.TextStyle.short)
@@ -90,7 +90,7 @@ class Workshop_Course_List(discord.ui.View):
         self.bot = bot
 
     @discord.ui.select(
-        placeholder="Please select the course you need help with: ",
+        placeholder="Please select the course you are making the workshop for: ",
         options=[
             discord.SelectOption(label="COSC-1336", value="COSC-1336"),
             discord.SelectOption(label="COSC-1436", value="COSC-1436"),
@@ -103,6 +103,7 @@ class Workshop_Course_List(discord.ui.View):
         ]
     )
     async def Chosen_Courses(self, interaction: discord.Interaction, select):
+        await interaction.message.delete()
         workshop_course = select.values[0]
         username = interaction.user.name
         await interaction.response.send_modal(Create_Workshop_deeds(self.bot, workshop_course, username))
@@ -117,9 +118,11 @@ class Create_Workshop_deeds(discord.ui.Modal, title="Create Workshop Deeds"):
     num_of_tutors = discord.ui.TextInput(label="Number of Tutors Needed", style=discord.TextStyle.short)
     Topics_Covered = discord.ui.TextInput(label="Topics to be covered", style=discord.TextStyle.paragraph)
 
-    async def Chosen_Courses(self, interaction: discord.Interaction, select):
+    async def on_submit(self, interaction: discord.Interaction):
         num_of_tutors = self.num_of_tutors.value
-        Topics_Covered = self.Topics_Covered.value       
+        Topics_Covered = self.Topics_Covered.value
+        print(type(Topics_Covered)) 
+        print(Workshop_Deeds.__table__)     
         Deed_ID = current_milli_time()
         New_Workshop_deeds =  Workshop_Deeds(
             ID=Deed_ID,
@@ -128,7 +131,7 @@ class Create_Workshop_deeds(discord.ui.Modal, title="Create Workshop Deeds"):
             Created_Time = datetime.now(),
             Current_Status = DEED_STATUS.UNCLAIMED,
             num_of_tutors = num_of_tutors,
-            Topics_Covered = Topics_Covered
+            Topic_Covered = Topics_Covered
         )
         session.add(New_Workshop_deeds)
         session.commit()                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
@@ -141,10 +144,11 @@ class Create_Workshop_deeds(discord.ui.Modal, title="Create Workshop Deeds"):
         embed.add_field(name=f"Needed Tutors", value=f"{num_of_tutors}", inline=True)
         embed.add_field(name="Current number of tutors: ", value=f"0", inline=True)
         embed.add_field(name=f"Topic to be covered", value=f"{Topics_Covered}", inline=True)
-        self.update_channel_id = int(os.getenv("Discord_Channel_ID"))
+        self.update_channel_id = int(os.getenv("Discord_Workshop_Channel"))
         self.update_channel = await self.bot.fetch_channel(self.update_channel_id)
         view = Claim_Workshop_deed(Deed_ID)
         await self.update_channel.send(embed=embed, view=view)
+        await interaction.response.send_message(f"The workshop deed has been created an it is currently in the open workshop channel", ephemeral=True)
 
 class Claim_Workshop_deed(discord.ui.View):
     def __init__(self, deed_ID):
@@ -156,7 +160,7 @@ class Claim_Workshop_deed(discord.ui.View):
         stmt = select(Workshop_Deeds).where(Workshop_Deeds.ID == self.deed_id, Workshop_Deeds.Current_Status == DEED_STATUS.COMPLETED)
         status = session.execute(stmt).scalars().all()
         if(status):
-            interaction.response.send_message(f"This deed is already closed", ephemeral=True)
+            await interaction.response.send_message(f"This deed is already closed", ephemeral=True)
             return
         tutor = interaction.user.name
         stmt = select(Tutor).where(Tutor.Discord_ID == tutor)
@@ -166,7 +170,7 @@ class Claim_Workshop_deed(discord.ui.View):
                                                          Workshop_Participations.Tutor == Current_Tutor.Discord_ID)
             Tutor_Confirm = session.execute(stmt).scalars().all()
             if(Tutor_Confirm):
-                interaction.response.send_message(f"You have already registered for this deed", ephemeral=True)
+                await interaction.response.send_message(f"You have already registered for this deed", ephemeral=True)
                 return
             stmt = select(Workshop_Participations).where(Workshop_Participations.Workshop_Deed_ID == self.deed_id)
             Participant_List = session.execute(stmt).scalars().all()
@@ -174,7 +178,7 @@ class Claim_Workshop_deed(discord.ui.View):
             Workshop = session.execute(stmt).scalars().first()
             Num_of_tutors = Workshop.num_of_tutors
             if(len(Participant_List) >= int(Num_of_tutors)):
-                interaction.response.send_message(f"The amount of tutor has already been reached", ephemeral=True)
+                await interaction.response.send_message(f"The amount of tutor has already been reached", ephemeral=True)
             else: 
                 await interaction.message.delete()
                 workshop_part = Workshop_Participations(
@@ -192,8 +196,8 @@ class Claim_Workshop_deed(discord.ui.View):
                 embed.add_field(name=f"Needed Tutors", value=f"{Num_of_tutors}", inline=True)
                 embed.add_field(name="Current number of tutors: ", value=f"{len(Participant_List) + 1}", inline=True)
                 embed.add_field(name=f"Topic to be covered", value=f"{Workshop.Topic_Covered}", inline=True)
-                interaction.response.send_message(f"You have been added to the deed teaam expect to be contacted by Franklin on the details of the workshop", ephemeral=True)
-                interaction.response.edit_message(embed=embed)
+                await interaction.user.send(f"You have been added to the deed team expect to be contacted by Franklin on the details of the workshop")
+                await interaction.response.send_message(embed=embed, view=Claim_Workshop_deed())
 
 class Complete_Workshop_Deeds(discord.ui.Modal, title="Complete Workshop Deed"):
     Deed_ID = discord.ui.TextInput(label="Deed ID", style=discord.TextStyle.short)
@@ -237,7 +241,7 @@ class Complete_Workshop_Deeds(discord.ui.Modal, title="Complete Workshop Deed"):
                 session.add(New_Point_Haver)
                 session.commit()
         else:
-            interaction.response.send_message(f"You are not a tutor you cannot run this command", ephemeral=True)
+            await interaction.response.send_message(f"You are not a tutor you cannot run this command", ephemeral=True)
 
 class View_All_Tutors():
     async def View_Embed():
