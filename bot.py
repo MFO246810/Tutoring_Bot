@@ -1,6 +1,7 @@
 import os
 import time as t
 import discord
+from info import info
 from models import Base
 from dotenv import load_dotenv
 from discord import app_commands
@@ -435,6 +436,10 @@ class Tutoring_Cog(commands.Cog):
 
     async def cog_unload(self):
         self.Update_Deeds.cancel()
+
+    @discord.app_commands.command(name="info", description="Contains info about the bot")
+    async def info(self, interaction: discord.Interaction):
+        await interaction.response.send_message(info)
 
     @discord.app_commands.command(name="question", description="This is a function for sending out questions directly to tutors")
     async def question(self, interaction: discord.Interaction):
