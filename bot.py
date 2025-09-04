@@ -11,7 +11,7 @@ from sqlalchemy.orm import sessionmaker
 from datetime import datetime, time, date
 from sqlalchemy import create_engine, select, func
 from models import Tutor, CurrentPoints, Availability, DAYS_OF_THE_WEEK, DEED_STATUS, Deeds, Announced_Deeds, Deeds_Logs, Tutored_Courses, Courses
-from Admin import add_new_tutor, Del_tutor, Alter_Tutor_points, Workshop_Course_List, View_All_Tutors, Complete_Workshop_Deeds
+from Admin import add_new_tutor, Del_tutor, Alter_Tutor_points, Workshop_Course_List, View_All_Tutors, Complete_Workshop_Deeds, Add_From_Files
 
 load_dotenv()
 engine = create_engine(os.getenv("DATABASE_URL"), echo=True)
@@ -157,7 +157,7 @@ class Course_List(discord.ui.View):
         placeholder="Please select the course you need help with: ",
         options=[
             discord.SelectOption(label="COSC-1336", value="COSC-1336"),
-            discord.SelectOption(label="COSC-1436", value="COSC-1436"),
+            discord.SelectOption(label="COSC-1437", value="COSC-1437"),
             discord.SelectOption(label="COSC-2436", value="COSC-2436"),
             discord.SelectOption(label="COSC-2425", value="COSC-2425"),
             discord.SelectOption(label="COSC-3320", value="COSC-3320"),
@@ -196,7 +196,7 @@ class Complete_Deeds_Course_List(discord.ui.View):
         placeholder="Please select the course you turtored: ",
         options=[
             discord.SelectOption(label="COSC-1336", value="COSC-1336"),
-            discord.SelectOption(label="COSC-1436", value="COSC-1436"),
+            discord.SelectOption(label="COSC-1437", value="COSC-1437"),
             discord.SelectOption(label="COSC-2436", value="COSC-2436"),
             discord.SelectOption(label="COSC-2425", value="COSC-2425"),
             discord.SelectOption(label="COSC-3320", value="COSC-3320"),
@@ -518,6 +518,16 @@ class Tutoring_Cog(commands.Cog):
         else:
             await interaction.response.send_message(view=Admin(self.bot))
     
+    @discord.app_commands.command(name="Data_entry_from_csv", description="This command is only meant to be used by the admin")
+    async def Data_entry_from_csv(self, interaction: discord.Interaction, file:discord.attachment):
+        await interaction.response.defer()
+    
+        file_path = f"./Uploads/{file.filename}"
+        View = Add_From_Files(file_path)
+
+        await file.save(file_path)
+        await interaction.response.send_message(view=View)
+
     @tasks.loop(minutes=15)
     async def Update_Deeds(self):
         stmt = select(Deeds).where(

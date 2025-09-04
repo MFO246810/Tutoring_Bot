@@ -8,6 +8,7 @@ from discord.ext import tasks, commands
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime, time, date
 from sqlalchemy import create_engine, select, func
+from setup import Add_Availabilities, Add_Tutors, Add_TUTORED_COURSES
 from models import Tutor, CurrentPoints, DEED_STATUS, ROLES, Active, Workshop_Deeds, Workshop_Participations, Workshop_Deeds_Logs
 
 load_dotenv()
@@ -18,7 +19,6 @@ session = Session()
 
 def current_milli_time():
     return round(t.time() * 1000)
-
 
 class add_new_tutor(discord.ui.Modal, title="New Tutor form"):
     Discord_ID = discord.ui.TextInput(label="Discord Username", style=discord.TextStyle.short)
@@ -255,5 +255,31 @@ class View_All_Tutors():
         for tutor in All_Tutors:
             tutors_embed.add_field(name=f"{tutor.First_Name} {tutor.Last_Name}: ", value=f"{tutor.Current_points.Deeds_Point}", inline=True)
         return tutors_embed
+    
+class Add_From_Files(discord.ui.View):
+    def __init__(self, filepath):
+        super().__init__(timeout=None)
+        self.filepath = filepath
+
+    @discord.ui.select(
+        placeholder="Select the type of data: ",
+        options=[
+            discord.SelectOption(label="Tutor", value="1"),
+            discord.SelectOption(label="Availabilities", value="2"),
+            discord.SelectOption(label="Tutored Courses", value="3")
+        ]
+    )
+
+    async def on_submit(self, interaction: discord.Interaction, select):
+        option = select.values[0]
+        if option  == 1 :
+            Add_Tutors(self.filepath)
+        elif option == 2:
+            Add_Availabilities(self.filepath)
+        elif option == 3:
+            Add_TUTORED_COURSES(self.filepath)
+
+
+
 
 

@@ -22,14 +22,14 @@ def current_milli_time():
     return round(time.time() * 1000)
 
 def Add_courses():
-    COURSE_LIST = ["COSC-1336", "COSC-1436", "COSC-2436", "COSC-2425", "COSC-3320", "COSC-3340", "COSC-3360", "COSC-3380"]
+    COURSE_LIST = ["COSC-1336", "COSC-1437", "COSC-2436", "COSC-2425", "COSC-3320", "COSC-3340", "COSC-3360", "COSC-3380"]
     for course in COURSE_LIST:
         New_course = Courses(Courses_ID=current_milli_time(), Courses_Name=course)
         session.add(New_course)
         session.commit()
 
-def Add_Tutors():
-    with open(CURRENT_TUTORS, 'r') as file:
+def Add_Tutors(file_path):
+    with open(file_path, 'r') as file:
         CSV_FILE = csv.DictReader(file)
         for row in CSV_FILE:
             row['Role'] = int(row['Role'])
@@ -42,8 +42,8 @@ def Add_Tutors():
                 session.add(New_Tutor)
                 session.commit()
 
-def Add_Availabilities():
-    with open(AVAILABILITIES, 'r') as file:
+def Add_Availabilities(file_path):
+    with open(file_path, 'r') as file:
         CSV_FILE = csv.DictReader(file)
         for row in CSV_FILE:
             print(row)
@@ -114,8 +114,8 @@ def Add_Availabilities():
                 session.add(New_Availability)
                 session.commit()
 
-def Add_TUTORED_COURSES():
-    with open(TUTORED_COURSES, 'r') as file:
+def Add_TUTORED_COURSES(file_path):
+    with open(file_path, 'r') as file:
         CSV_FILE = csv.DictReader(file)
         for row in CSV_FILE:
             stmt = select(Courses.Courses_ID).where(Courses.Courses_Name == row['Courses_ID'])
@@ -125,4 +125,3 @@ def Add_TUTORED_COURSES():
             session.add(New_Tutored_Courses)
             session.commit()
      
-Add_TUTORED_COURSES()
