@@ -1,6 +1,7 @@
 import os
 import csv
 import time
+import logging
 from datetime import datetime
 from models import Base
 from dotenv import load_dotenv
@@ -13,6 +14,15 @@ engine = create_engine(os.getenv("DATABASE_URL"), echo=True)
 Base.metadata.create_all(engine)
 Session = sessionmaker(bind=engine)
 session = Session()
+
+logging.basicConfig(
+    level=logging.INFO,  # DEBUG / INFO / WARNING / ERROR / CRITICAL
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[
+        logging.FileHandler("Deed_Manager.log", encoding="utf-8"),
+        logging.StreamHandler()
+    ]
+)
 
 AVAILABILITIES = "Tutoring_Bot_availabilities.csv"
 CURRENT_TUTORS = "Tutoring_Bot_Current_Tutors.csv"

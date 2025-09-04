@@ -1,5 +1,6 @@
 import os
 import time as t
+import logging
 import discord
 from models import Base
 from dotenv import load_dotenv
@@ -10,6 +11,18 @@ from datetime import datetime, time, date
 from sqlalchemy import create_engine, select, func
 from setup import Add_Availabilities, Add_Tutors, Add_TUTORED_COURSES
 from models import Tutor, CurrentPoints, DEED_STATUS, ROLES, Active, Workshop_Deeds, Workshop_Participations, Workshop_Deeds_Logs
+
+logging.basicConfig(
+    level=logging.INFO,  # DEBUG / INFO / WARNING / ERROR / CRITICAL
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[
+        logging.FileHandler("Deed_Manager.log", encoding="utf-8"),
+        logging.StreamHandler()
+    ]
+)
+discord.utils.setup_logging(level=logging.INFO, root=False)
+bot_logger = logging.getLogger("Tutoring_Bot")
+commands_logger = logging.getLogger("Tutoring_Bot.commands")
 
 load_dotenv()
 engine = create_engine(os.getenv("DATABASE_URL"), echo=True)
@@ -27,6 +40,7 @@ class add_new_tutor(discord.ui.Modal, title="New Tutor form"):
     Role = discord.ui.TextInput(label="Role 1 for Tutor | 2 for Workshop director", style=discord.TextStyle.short)
 
     async def on_submit(self, interaction: discord.Interaction):
+        bot_logger.info(f"New tutor form submitted by {interaction.user.name}")
         Discord_ID = self.Discord_ID.value
         First_Name = self.First_Name.value
         Last_Name = self.Last_Name.value
@@ -44,20 +58,24 @@ class add_new_tutor(discord.ui.Modal, title="New Tutor form"):
         )
         session.add(New_Tutor)
         session.commit()
+        bot_logger.info(f"New tutor {Discord_ID} added successfully")
         await interaction.response.send_message(f"This tutor: {Discord_ID} has been sucessfully added", ephemeral=True)
 
 class Del_tutor(discord.ui.Modal, title="Delete Tutor form"):
     Discord_ID = discord.ui.TextInput(label="Discord Username", style=discord.TextStyle.short)
 
     async def on_submit(self, interaction: discord.Interaction):
+        bot_logger.info(f"Delete tutor form submitted by {interaction.user.name}")
         Discord_ID = self.Discord_ID.value
         v_stmt = select(Tutor).where(Tutor.Discord_ID == Discord_ID)
         Current_Tutor = session.execute(v_stmt).scalars().first()
         if(Current_Tutor):
             Current_Tutor.Is_Active = Active.NOTACTIVE
             session.commit()
+            bot_logger.info(f"Tutor {Discord_ID} deleted successfully")
             await interaction.response.send_message(f"This tutor: {Discord_ID} has been sucessfully deleted", ephemeral=True)
         else:
+            bot_logger.warning(f"Tutor {Discord_ID} not found for deletion")
             await interaction.response.send_message(f"This person: {Discord_ID} is not a tutor", ephemeral=True)
 
 class Alter_Tutor_points(discord.ui.Modal, title="Alter Point Value"):
@@ -65,12 +83,14 @@ class Alter_Tutor_points(discord.ui.Modal, title="Alter Point Value"):
     New_Point_Value = discord.ui.TextInput(label="New Points Value", style=discord.TextStyle.short)
 
     async def on_submit(self, interaction: discord.Interaction):
+        bot_logger.info(f"Alter points form submitted by {interaction.user.name}")
         Discord_ID = self.Discord_ID.value
         New_Point_Value = int(self.New_Point_Value.value)
 
         v_stmt = select(Tutor).where(Tutor.Discord_ID == Discord_ID)
         Current_Tutor = session.execute(v_stmt).scalars().first()
         if(Current_Tutor and Current_Tutor.Is_Active == Active.ACTIVE):
+            bot_logger.info(f"Altering points for tutor {Discord_ID} to {New_Point_Value}")
             if(Current_Tutor.Current_points == None):
                 New_Point_Haver = CurrentPoints(
                     Discord_ID = Current_Tutor.Discord_ID,
@@ -82,6 +102,7 @@ class Alter_Tutor_points(discord.ui.Modal, title="Alter Point Value"):
                 former_value = Current_Tutor.Current_points
                 Current_Tutor.Current_points = New_Point_Value
             session.commit()
+            bot_logger.info(f"Tutor {Discord_ID} points changed successfully from {former_value} to {New_Point_Value}")
             await interaction.response.send_message(f"This tutor: {Discord_ID} points has been changed sucessfully from {former_value} to {New_Point_Value}", ephemeral=True)
 
 class Workshop_Course_List(discord.ui.View):
@@ -103,6 +124,7 @@ class Workshop_Course_List(discord.ui.View):
         ]
     )
     async def Chosen_Courses(self, interaction: discord.Interaction, select):
+        bot_logger.info(f"Workshop course selected by {interaction.user.name}")
         await interaction.message.delete()
         workshop_course = select.values[0]
         username = interaction.user.name
@@ -134,6 +156,7 @@ class Create_Workshop_deeds(discord.ui.Modal, title="Create Workshop Deeds"):
             Topic_Covered = Topics_Covered
         )
         session.add(New_Workshop_deeds)
+        bot_logger.info(f"Workshop deed creation submitted by {interaction.user.name} for course {self.course}")
         session.commit()                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     
         embed = discord.Embed(
             title="Workshop Deed",
@@ -148,6 +171,7 @@ class Create_Workshop_deeds(discord.ui.Modal, title="Create Workshop Deeds"):
         self.update_channel = await self.bot.fetch_channel(self.update_channel_id)
         view = Claim_Workshop_deed(Deed_ID)
         await self.update_channel.send(embed=embed, view=view)
+        bot_logger.info(f"Workshop deed {Deed_ID} created successfully for course {self.course}")
         await interaction.response.send_message(f"The workshop deed has been created an it is currently in the open workshop channel", ephemeral=True)
 
 class Claim_Workshop_deed(discord.ui.View):
@@ -157,9 +181,11 @@ class Claim_Workshop_deed(discord.ui.View):
 
     @discord.ui.button(label="Join the team", style=discord.ButtonStyle.green)
     async def button_callback (self, interaction: discord.Interaction, button: discord.ui.Button):
+        bot_logger.info(f"Join team button clicked by {interaction.user.name} for deed {self.deed_id}")
         stmt = select(Workshop_Deeds).where(Workshop_Deeds.ID == self.deed_id, Workshop_Deeds.Current_Status == DEED_STATUS.COMPLETED)
         status = session.execute(stmt).scalars().all()
         if(status):
+            bot_logger.info(f"Deed {self.deed_id} is already closed, cannot join team - {interaction.user.name} attempted to join")
             await interaction.response.send_message(f"This deed is already closed", ephemeral=True)
             return
         tutor = interaction.user.name
@@ -170,6 +196,7 @@ class Claim_Workshop_deed(discord.ui.View):
                                                          Workshop_Participations.Tutor == Current_Tutor.Discord_ID)
             Tutor_Confirm = session.execute(stmt).scalars().all()
             if(Tutor_Confirm):
+                bot_logger.info(f"Tutor {Current_Tutor.Discord_ID} has already registered for deed {self.deed_id}, cannot join again")
                 await interaction.response.send_message(f"You have already registered for this deed", ephemeral=True)
                 return
             stmt = select(Workshop_Participations).where(Workshop_Participations.Workshop_Deed_ID == self.deed_id)
@@ -179,6 +206,8 @@ class Claim_Workshop_deed(discord.ui.View):
             Num_of_tutors = Workshop.num_of_tutors
             if(len(Participant_List) >= int(Num_of_tutors)):
                 await interaction.response.send_message(f"The amount of tutor has already been reached", ephemeral=True)
+                bot_logger.info(f"Deed {self.deed_id} has reached max tutors, cannot join - {interaction.user.name} attempted to join")
+                return
             else: 
                 await interaction.message.delete()
                 workshop_part = Workshop_Participations(
@@ -186,6 +215,7 @@ class Claim_Workshop_deed(discord.ui.View):
                     Tutor=tutor
                 )
                 session.add(workshop_part)
+                bot_logger.info(f"Tutor {tutor} added to deed {self.deed_id} participation list")
                 session.commit
                 embed = discord.Embed(
                 title="Workshop Deed",
@@ -203,6 +233,7 @@ class Complete_Workshop_Deeds(discord.ui.Modal, title="Complete Workshop Deed"):
     Deed_ID = discord.ui.TextInput(label="Deed ID", style=discord.TextStyle.short)
 
     async def on_submit(self, interaction: discord.Interaction):
+        bot_logger.info(f"Complete workshop deed form submitted by {interaction.user.name} for deed {self.Deed_ID.value}")      
         student = interaction.user.name
         Deed_id = int(self.Deed_ID.value)
         v_stmt = select(Tutor).where(Tutor.Discord_ID == student)
@@ -219,6 +250,7 @@ class Complete_Workshop_Deeds(discord.ui.Modal, title="Complete Workshop Deed"):
             session.add(Workshop_log)
             stmt = select(CurrentPoints).where(CurrentPoints.Discord_ID == Current_Tutor.Discord_ID)
             Current_Points = session.execute(stmt).scalars().first()
+            bot_logger.info(f"Workshop deed {Deed_id} completed by tutor {Current_Tutor.Discord_ID}")
             if(Current_Points):
                 Current_Points.Deeds_Point = Current_Points.Deeds_Point + 2
                 point_Embed =discord.Embed(
@@ -240,11 +272,16 @@ class Complete_Workshop_Deeds(discord.ui.Modal, title="Complete Workshop Deed"):
                 await interaction.response.send_message(embed=point_Embed)
                 session.add(New_Point_Haver)
                 session.commit()
+            Current_Deed.Current_Status = DEED_STATUS.COMPLETED
+            session.commit()
+            bot_logger.info(f"Workshop deed {Deed_id} status updated to COMPLETED")
         else:
+            bot_logger.warning(f"User {student} is not a tutor, cannot complete deed {Deed_id}")
             await interaction.response.send_message(f"You are not a tutor you cannot run this command", ephemeral=True)
 
 class View_All_Tutors():
     async def View_Embed():
+        bot_logger.info("Generating current tutors embed")
         stmt = select(Tutor).join(Tutor.Current_points)
         All_Tutors = session.execute(stmt).scalars().all()
         tutors_embed = discord.Embed(
@@ -272,13 +309,17 @@ class Add_From_Files(discord.ui.View):
 
     async def on_submit(self, interaction: discord.Interaction, select):
         option = select.values[0]
-        if option  == 1 :
+        if option  == "1" :
+            bot_logger.info(f"Adding tutors from file {self.filepath} as requested by {interaction.user.name}")
             Add_Tutors(self.filepath)
-        elif option == 2:
+        elif option == "2":
+            bot_logger.info(f"Adding availabilities from file {self.filepath} as requested by {interaction.user.name}")
             Add_Availabilities(self.filepath)
-        elif option == 3:
+        elif option == "3":
+            bot_logger.info(f"Adding tutored courses from file {self.filepath} as requested by {interaction.user.name}")
             Add_TUTORED_COURSES(self.filepath)
-
+        await interaction.response.send_message(f"Data has been added successfully", ephemeral=True)
+        await interaction.message.delete() 
 
 
 
