@@ -607,7 +607,6 @@ class Tutoring_Cog(commands.Cog):
     
     @discord.app_commands.command(name="data_entry_from_csv", description="This command is only meant to be used by the admin")
     async def data_entry_from_csv(self, interaction: discord.Interaction, file:discord.Attachment):
-        await interaction.response.defer()
         if not interaction.user.guild_permissions.administrator:
             bot_logger.warning(f"User {interaction.user.name} attempted to use data entry from csv without permissions")
             return await interaction.followup.send("You don't have admin permissions to use this command.")
