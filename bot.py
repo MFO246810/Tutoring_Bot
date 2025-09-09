@@ -257,7 +257,7 @@ class _Buttons_(discord.ui.View):
         Current_Tutor = session.execute(v_stmt).scalars().first()
         if(Current_Tutor == None):
             bot_logger.warning(f"User {interaction.user.name} is not a tutor, cannot accept deed {self.deed_id}")
-            interaction.response.send_message("You are not a tutor youy cannot claim this deed", ephemeral=True)
+            await interaction.response.send_message("You are not a tutor youy cannot claim this deed", ephemeral=True)
             return
         stmt = select(Deeds).where(Deeds.ID == int(self.deed_id))
         Deed = session.execute(stmt).scalars().first()
